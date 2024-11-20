@@ -14,6 +14,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  Spinner,
 } from "@nextui-org/react";
 import { User, UserPlus, Edit, Trash2, Send } from "lucide-react";
 
@@ -37,11 +38,18 @@ export default function StudentManagement() {
   const [apiRequest, setApiRequest] = useState("");
   const [apiResponse, setApiResponse] = useState("");
   const [statusCode, setStatusCode] = useState(-1);
+  const [loading, setLoading] = useState({
+    fetch: false,
+    add: false,
+    update: false,
+    delete: false,
+    view: false,
+  });
 
   useEffect(() => {
-    // scroll to top when apiRequest or apiResponse changes
+    // scroll to top when some loading state changes
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [apiRequest, apiResponse]);
+  }, [loading.view, loading.delete, loading.update, loading.add]);
 
   const headers = {
     "Content-Type": "application/json",
@@ -49,6 +57,7 @@ export default function StudentManagement() {
   };
 
   async function fetchStudents() {
+    setLoading((prev) => ({ ...prev, fetch: true }));
     setApiRequest(
       `GET ${BASE_URL}/students\nHeaders: ${JSON.stringify(headers, null, 2)}`
     );
@@ -67,10 +76,13 @@ export default function StudentManagement() {
       setApiResponse(JSON.stringify(data, null, 2));
     } catch (error) {
       setApiResponse(JSON.stringify(error, null, 2));
+    } finally {
+      setLoading((prev) => ({ ...prev, fetch: false }));
     }
   }
 
   async function getStudent(id) {
+    setLoading((prev) => ({ ...prev, view: true }));
     setApiRequest(
       `GET ${BASE_URL}/students/${id}\nHeaders: ${JSON.stringify(
         headers,
@@ -93,10 +105,14 @@ export default function StudentManagement() {
       setApiResponse(JSON.stringify(data, null, 2));
     } catch (error) {
       setApiResponse(JSON.stringify(error, null, 2));
+    } finally {
+      setLoading((prev) => ({ ...prev, view: false }));
     }
   }
 
   async function addStudent() {
+    setLoading((prev) => ({ ...prev, add: true }));
+    delete currentStudent._id;
     setApiRequest(
       `POST ${BASE_URL}/students\nHeaders: ${JSON.stringify(
         headers,
@@ -120,12 +136,23 @@ export default function StudentManagement() {
 
       const data = await response.json();
       setApiResponse(JSON.stringify(data, null, 2));
+      if (response.ok) {
+        setCurrentStudent({
+          studentId: "",
+          name: "",
+          age: 0,
+          gpa: 0,
+        });
+      }
     } catch (error) {
       setApiResponse(JSON.stringify(error, null, 2));
+    } finally {
+      setLoading((prev) => ({ ...prev, add: false }));
     }
   }
 
   async function updateStudent() {
+    setLoading((prev) => ({ ...prev, update: true }));
     setApiRequest(
       `PUT ${BASE_URL}/students/${
         currentStudent._id
@@ -156,10 +183,13 @@ export default function StudentManagement() {
       setApiResponse(data);
     } catch (error) {
       setApiResponse(JSON.stringify(error, null, 2));
+    } finally {
+      setLoading((prev) => ({ ...prev, update: false }));
     }
   }
 
   const deleteStudent = async (id) => {
+    setLoading((prev) => ({ ...prev, delete: true }));
     setApiRequest(
       `DELETE ${BASE_URL}/students/${id}\nHeaders: ${JSON.stringify(
         headers,
@@ -184,6 +214,8 @@ export default function StudentManagement() {
       setApiResponse(data);
     } catch (error) {
       setApiResponse(JSON.stringify(error, null, 2));
+    } finally {
+      setLoading((prev) => ({ ...prev, delete: false }));
     }
   };
 
@@ -209,7 +241,6 @@ export default function StudentManagement() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Thẻ Student Form */}
         <Card>
           <CardHeader>
             <h2 className="text-lg font-semibold">Student Form</h2>
@@ -238,6 +269,7 @@ export default function StudentManagement() {
             <Input
               label="Age"
               type="number"
+              step={0.1}
               value={currentStudent.age.toString()}
               onChange={(e) =>
                 setCurrentStudent({
@@ -261,14 +293,20 @@ export default function StudentManagement() {
               <Button
                 color="primary"
                 onClick={addStudent}
-                startContent={<UserPlus size={18} />}
+                startContent={
+                  loading.add ? <Spinner size="sm" /> : <UserPlus size={18} />
+                }
+                isLoading={loading.add}
               >
                 Add Student
               </Button>
               <Button
                 color="secondary"
                 onClick={updateStudent}
-                startContent={<Edit size={18} />}
+                startContent={
+                  loading.update ? <Spinner size="sm" /> : <Edit size={18} />
+                }
+                isLoading={loading.update}
               >
                 Update Student
               </Button>
@@ -276,7 +314,6 @@ export default function StudentManagement() {
           </CardBody>
         </Card>
 
-        {/* Thẻ API Information */}
         <Card>
           <CardHeader>
             <h2 className="text-lg font-semibold">API Information</h2>
@@ -305,12 +342,19 @@ export default function StudentManagement() {
         color="primary"
         onClick={fetchStudents}
         className="mb-4"
-        startContent={<Send size={18} />}
+        startContent={
+          loading.fetch ? <Spinner size="sm" /> : <Send size={18} />
+        }
+        isLoading={loading.fetch}
       >
         Fetch Students
       </Button>
 
-      <Table aria-label="Student table">
+      <Table
+        aria-label="Student table"
+        loadingContent={<Spinner label="Loading..." />}
+        isLoading={loading.fetch}
+      >
         <TableHeader>
           <TableColumn>Id</TableColumn>
           <TableColumn>Student Id</TableColumn>
@@ -333,7 +377,10 @@ export default function StudentManagement() {
                     size="sm"
                     color="primary"
                     onClick={() => getStudent(student._id)}
-                    startContent={<User size={18} />}
+                    startContent={
+                      loading.view ? <Spinner size="sm" /> : <User size={18} />
+                    }
+                    isLoading={loading.view}
                   >
                     View
                   </Button>
@@ -341,7 +388,14 @@ export default function StudentManagement() {
                     size="sm"
                     color="danger"
                     onClick={() => deleteStudent(student._id)}
-                    startContent={<Trash2 size={18} />}
+                    startContent={
+                      loading.delete ? (
+                        <Spinner size="sm" />
+                      ) : (
+                        <Trash2 size={18} />
+                      )
+                    }
+                    isLoading={loading.delete}
                   >
                     Delete
                   </Button>
